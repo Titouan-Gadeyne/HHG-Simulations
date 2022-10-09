@@ -13,10 +13,13 @@ class Beam():
     "Transverse mode formulae"
     # Gaussian beam expressions
     def R(self, z):
-        if z!=0:
-            return z*(1 + (self.zR/z)**2)
+        if type(z) == np.ndarray:
+            return np.where( (z!=0) , z*(1 + (self.zR/z)**2), np.inf)
         else:
-            return np.inf # infinite radius of curvature at focus
+            if z!=0:
+                return z*(1 + (self.zR/z)**2)
+            else:
+                return np.inf
 
     def Gouy(self, z):
         return np.arctan(z/self.zR)
@@ -109,6 +112,7 @@ class Beam():
 
         return np.meshgrid(x_axis, y_axis)
 
+
 class Mask():
     def __init__(self):
         pass
@@ -121,3 +125,9 @@ class Mask():
         phase = np.sign(y)*np.pi/2 + np.pi/2
         return np.exp(1j*phase)
 
+
+def Tilt_beam(x, y, z, angle): # returns xyz coordinates for a cut of the beam at z=0 propagating at an angle
+    return x, y, z+y*np.tan(-angle)
+
+def Offset_beam(x, y, z, x0, y0): # returns xyz coordinates for a cut of the beam at z=0, offset from the center
+    return x+x0, y+y0, z
