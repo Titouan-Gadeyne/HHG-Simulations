@@ -87,6 +87,10 @@ class Beam():
         
         return field_d, grid_d
 
+    # Adds a phase factor to simulate passing through a lens
+    def Lens(self, field, grid, f):
+        return field * self.SphFactor(*grid, -f) # minus sign to have converging lens for f>0
+
     "Grid generators"
     # Returns a meshgrid with desired L and N
     def Grid(self, Lx, Ly, Nx, Ny):
@@ -104,3 +108,16 @@ class Beam():
         y_axis = np.linspace(-ly/2, ly/2, Ny) 
 
         return np.meshgrid(x_axis, y_axis)
+
+class Mask():
+    def __init__(self):
+        pass
+
+    def Iris(self, x, y, R):
+        r = np.sqrt(x**2 + y**2)
+        return np.where((r<R), 1, 0)
+
+    def ZeroPi(self, x, y):
+        phase = np.sign(y)*np.pi/2 + np.pi/2
+        return np.exp(1j*phase)
+
