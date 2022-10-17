@@ -29,7 +29,7 @@ def ShowHHG(IRfield, XUV_NF, XUV_FF, grid_NF, grid_FF):
     fig, ax = plt.subplots(1, 3)
     ax[0].imshow(np.abs(IRfield), extent=extent_NF, aspect='equal', vmin=0, cmap='hot')
     ax[1].imshow(np.abs(XUV_NF), extent=extent_NF, aspect='equal', vmin=0, cmap='Purples_r')
-    ax[2].imshow(np.abs(XUV_FF), extent=extent_FF, aspect='equal', vmin=0, cmap='Purples_r')
+    ax[2].imshow(np.abs(XUV_FF), extent=extent_FF, aspect='equal', vmin=0, cmap='gist_stern')
 
     return fig
 
