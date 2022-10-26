@@ -94,6 +94,9 @@ class Beam():
     def Lens(self, field, grid, f):
         return field * self.SphFactor(*grid, -f) # minus sign to have converging lens for f>0
 
+    def PhaseGrating(self, x, y, field, theta):
+        return field * np.exp(-1j*2*np.pi*np.sin(theta)*y/self.lam)
+
     "Grid generators"
     # Returns a meshgrid with desired L and N
     def Grid(self, Lx, Ly, Nx, Ny):
