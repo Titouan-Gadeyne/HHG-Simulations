@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from colorsys import hls_to_rgb
+import matplotlib.gridspec as gridspec
 
 def ShowField(field, grid):
     x, y = grid[0][0], grid[1].T[0] # retrieve axes from meshgrid
@@ -26,7 +28,7 @@ def ShowHHG(IRfield, XUV_NF, XUV_FF, grid_NF, grid_FF):
     extent_NF = Extent(grid_NF)
     extent_FF = Extent(grid_FF)
 
-    fig, ax = plt.subplots(1, 3)
+    fig, ax = plt.subplots(1, 3, figsize=(10, 8))
     ax[0].imshow(np.abs(IRfield), extent=extent_NF, aspect='equal', vmin=0, cmap='hot')
     ax[1].imshow(np.abs(XUV_NF), extent=extent_NF, aspect='equal', vmin=0, cmap='Purples_r')
     ax[2].imshow(np.abs(XUV_FF), extent=extent_FF, aspect='equal', vmin=0, cmap='gist_stern')
@@ -46,4 +48,55 @@ def OrdersLineout(XUV_FF, grid_FF, q, theta):
 
     return fig
 
+# To put a 2D colormap on a 2D complex field
+def colorize(z):
+    r = np.abs(z) / np.max(np.abs(z))
+    arg = np.angle(z) 
 
+    h = (arg + np.pi)  / (2 * np.pi) + 0.5
+    l = r/2 # linear brightness variation, peaks at 1/2
+    s = 0.8
+
+    c = np.vectorize(hls_to_rgb) (h,l,s) # --> tuple
+    c = np.array(c)  # -->  array of (3,n,m) shape, but need (n,m,3)
+    c = c.swapaxes(0,2)
+    return c
+
+def ShowFieldPhase(field, grid):
+    x, y = grid[0][0], grid[1].T[0] # retrieve axes from meshgrid
+    Lx, Ly = x[-1]-x[0], y[-1]-y[0]
+    Nx, Ny = len(x), len(y)
+
+    extent=[x[0], x[-1], y[0], y[-1]]
+    aspect = Lx/Ly
+
+    # Create 2D colormap reference
+    x = np.linspace(0, 1, 100).T
+    y = np.exp(1j*np.linspace(-np.pi, np.pi, 100))
+    map = np.outer(x, y)
+
+    fig = plt.figure()
+
+    gs = gridspec.GridSpec(12, 13)
+    gs.update(wspace=0.05)
+
+    ax0 = plt.subplot(gs[:, 0:12])
+    ax1 = plt.subplot(gs[4:, 12])
+
+    ax = [ax0, ax1]
+
+
+    ax[0].imshow(colorize(field), extent=extent, aspect=aspect)
+    ax[1].imshow(colorize(map), extent=[0, 1, -np.pi, np.pi], aspect='auto')
+
+    ax[0].set_xlabel('x (m)')
+    ax[0].set_ylabel('y (m)')
+
+    ax[1].set_xlabel('Amplitude')
+    ax[1].set_ylabel('Phase')
+    ax[1].yaxis.set_label_position("right")
+    ax[1].yaxis.tick_right()
+    ax[1].set_xticks([0, 1], [0, 1])
+    ax[1].set_yticks([-np.pi, np.pi], [r'-$\pi$', r'$\pi$'])
+
+    return fig
