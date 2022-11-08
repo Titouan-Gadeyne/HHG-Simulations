@@ -138,6 +138,8 @@ class Beam():
         return np.meshgrid(x_axis, y_axis)
 
 
+
+
 class Pulse():
     def __init__(self, w0, lam, wt):
         self.w0 = w0
@@ -148,7 +150,6 @@ class Pulse():
         self.omega = 2*np.pi*3e8/lam
 
     "Spatio-Temporal pulse profiles"
-
     def LG_STOV(self, x, y, t, l, p):
         T = t *self.w0 / self.wt
         r = np.sqrt(x**2 + T**2)
@@ -156,7 +157,7 @@ class Pulse():
 
         C = np.sqrt( 2*np.math.factorial(p) / (np.pi + np.math.factorial(p+np.abs(l)) ) ) # normalization factor
 
-        return np.exp(-(x**2+y**2)/self.w0**2) * np.exp(-t**2/self.wt**2) * np.exp(-1j*self.omega*t) \
+        return np.exp(-(x**2+y**2)/self.w0**2) * np.exp(-t**2/self.wt**2) * np.exp(1j*self.omega*t) \
                 * C * genlaguerre(p, np.abs(l))(2*(r**2/self.w0**2)) * np.exp(-1j*l*theta) * (r*np.sqrt(2)/self.w0)**np.abs(l)
 
     "Propagation"
@@ -214,10 +215,10 @@ class Pulse():
         Lx, Lt = x[-1]-x[0], t[-1]-t[0]
         Nx, Nt = len(x), len(t)
 
-        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(field_0, axes=-1), axis=-1), axes=-1) # fft assumes origin of axis at top left corner, need to fftshift beforehand
-        field = field * (Lx/(Nx-1)) * (Lt/(Nt-1)) # correct for the sampling rate (difference between continuous and discrete FT)
+        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(field_0, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
+        field = field * (Lt/(Nt-1)) # correct for the sampling rate (difference between continuous and discrete FT)
 
-        # Compute the conjugate x and y axis. Their width is appx (N lam z / L)
+        # Compute the conjugate omega axis
         FT_t_axis = np.fft.fftshift(np.fft.fftfreq(Nt, Lt/(Nt-1)))
         grid_d = np.meshgrid(x, FT_t_axis)
 
@@ -260,3 +261,19 @@ def Tilt_beam(x, y, z, angle): # returns xyz coordinates for a cut of the beam a
 
 def Offset_beam(x, y, z, x0, y0): # returns xyz coordinates for a cut of the beam at z=0, offset from the center
     return x+x0, y+y0, z
+
+class Grating(): # FT a x-t field along t
+    def Disperse(self, field_0, grid_xt):
+
+        x, t = grid_xt[0][0], grid_xt[1].T[0] # retrieve axes from meshgrid
+        Lx, Lt = x[-1]-x[0], t[-1]-t[0]
+        Nx, Nt = len(x), len(t)
+
+        spectrum = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(field_0, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
+        spectrum = spectrum * (Lt/(Nt-1)) # correct for the sampling rate (difference between continuous and discrete FT)
+
+        # Compute the conjugate omega axis
+        w = np.fft.fftshift(np.fft.fftfreq(Nt, Lt/(Nt-1))) * 2*np.pi
+        grid_xw = np.meshgrid(x, w)
+
+        return spectrum, grid_xw
