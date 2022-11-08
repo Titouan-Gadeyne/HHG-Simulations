@@ -51,7 +51,7 @@ def OrdersLineout(XUV_FF, grid_FF, q, theta):
 class Phase2D():
     # To put a 2D colormap on a 2D complex field
     def colorize(self, z):
-        r = np.abs(z) / np.nanmax(np.abs(z))
+        r = (np.abs(z) / np.nanmax(np.abs(z)))
         arg = np.angle(z) 
 
         h = (arg + np.pi)  / (2 * np.pi) + 0.5
