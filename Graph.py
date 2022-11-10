@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from colorsys import hls_to_rgb
 import matplotlib.gridspec as gridspec
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 def ShowField(field, grid):
     x, y = grid[0][0], grid[1].T[0] # retrieve axes from meshgrid
@@ -50,8 +51,12 @@ def OrdersLineout(XUV_FF, grid_FF, q, theta):
 
 class Phase2D():
     # To put a 2D colormap on a 2D complex field
-    def colorize(self, z):
-        r = (np.abs(z) / np.nanmax(np.abs(z)))
+    def colorize(self, z, mode='Amplitude'):
+
+        if mode=='Amplitude':
+            r = (np.abs(z) / np.nanmax(np.abs(z)))
+        elif mode=='Intensity':
+            r = (np.abs(z) / np.nanmax(np.abs(z)))**2
         arg = np.angle(z) 
 
         h = (arg + np.pi)  / (2 * np.pi) + 0.5
@@ -63,14 +68,28 @@ class Phase2D():
         c = c.transpose(1,2,0)
         return c
 
-    def key_inset(self):
+    def key_inset(self, mode, ax):
         amp = np.linspace(0, 1, 100)
         phase = np.linspace(-np.pi, np.pi, 100)
         z = np.outer(amp, np.exp(1j*phase))
-        key = self.colorize(z.T)
-        return amp, phase, key
+        key = self.colorize(z=z.T, mode=mode)
 
-    def ShowFieldPhase(self, field, grid):
+        ins = inset_axes(ax, width="100%", height="100%",
+                   bbox_to_anchor=(1.05, 0, .05, .6),
+                   bbox_transform=ax.transAxes, loc=2, borderpad=0)
+        ins.imshow(key, extent=[0, 1, -np.pi, np.pi])
+        ins.tick_params(left=False, right=True, labelleft=False, labelright=True)
+        ins.set_xticks([0, 1], [0, 1])
+        ins.set_yticks([-np.pi, 0, np.pi], [r"-$\pi$", "$0$", r"$\pi$"])
+        if mode=="Amplitude":
+            ins.set_xlabel(r'$|E|$')
+        elif mode=="Intensity":
+            ins.set_xlabel(r'$|E|^2$')
+        ins.set_ylabel(r'$\arg{E}$')
+
+        return ins
+
+    def ShowFieldPhase(self, field, grid, mode):
         x, y = grid[0][0], grid[1].T[0] # retrieve axes from meshgrid
         Lx, Ly = x[-1]-x[0], y[-1]-y[0]
         Nx, Ny = len(x), len(y)
@@ -94,8 +113,8 @@ class Phase2D():
         ax = [ax0, ax1]
 
 
-        ax[0].imshow(self.colorize(field), extent=extent, aspect=aspect)
-        ax[1].imshow(self.colorize(map), extent=[0, 1, -np.pi, np.pi], aspect='auto')
+        ax[0].imshow(self.colorize(z=field, mode=mode), extent=extent, aspect=aspect)
+        ax[1].imshow(self.colorize(z=map, mode=mode), extent=[0, 1, -np.pi, np.pi], aspect='auto')
 
         ax[0].set_xlabel('x (m)')
         ax[0].set_ylabel('y (m)')

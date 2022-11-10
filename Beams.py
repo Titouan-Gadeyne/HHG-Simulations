@@ -160,6 +160,16 @@ class Pulse():
         return np.exp(-(x**2+y**2)/self.w0**2) * np.exp(-t**2/self.wt**2) * np.exp(1j*self.omega*t) \
                 * C * genlaguerre(p, np.abs(l))(2*(r**2/self.w0**2)) * np.exp(-1j*l*theta) * (r*np.sqrt(2)/self.w0)**np.abs(l)
 
+    def RemoveDynPhase(self, field, grid_xt):
+        x, t = grid_xt[0][0], grid_xt[1].T[0] # retrieve axes from meshgrid
+        Lx, Lt = x[-1]-x[0], t[-1]-t[0]
+        Nx, Nt = len(x), len(t) 
+
+        phase = np.exp(-1j*self.omega*t)
+        ph2D = np.outer(phase, np.ones(Nx))
+
+        return field * ph2D
+
     "Propagation"
     # Spherical phase factor
     def SphFactor(self, x, y, z):
@@ -209,22 +219,6 @@ class Pulse():
     def Lens(self, field, grid, f):
         return field * self.SphFactor(*grid, -f) # minus sign to have converging lens for f>0
 
-    def Grating(self, field_0, grid_0):
-
-        x, t = grid_0[0][0], grid_0[1].T[0] # retrieve axes from meshgrid
-        Lx, Lt = x[-1]-x[0], t[-1]-t[0]
-        Nx, Nt = len(x), len(t)
-
-        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(field_0, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
-        field = field * (Lt/(Nt-1)) # correct for the sampling rate (difference between continuous and discrete FT)
-
-        # Compute the conjugate omega axis
-        FT_t_axis = np.fft.fftshift(np.fft.fftfreq(Nt, Lt/(Nt-1)))
-        grid_d = np.meshgrid(x, FT_t_axis)
-
-        field_d = field
-
-        return field_d, grid_d
 
 
     "Grid generators"
@@ -277,3 +271,18 @@ class Grating(): # FT a x-t field along t
         grid_xw = np.meshgrid(x, w)
 
         return spectrum, grid_xw
+
+    def Recombine(self, field_0, grid_xt):
+
+        x, w = grid_xt[0][0], grid_xt[1].T[0] # retrieve axes from meshgrid
+        Lx, Lw = x[-1]-x[0], w[-1]-w[0]
+        Nx, Nw = len(x), len(w)
+
+        pulse = np.fft.fftshift(np.fft.ifft(np.fft.ifftshift(field_0, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
+        pulse = pulse * (Lw/(Nw-1)) # correct for the sampling rate (difference between continuous and discrete FT)
+
+        # Compute the conjugate t axis
+        t = np.fft.fftshift(np.fft.fftfreq(Nw, Lw/(Nw-1))) * 2*np.pi
+        grid_xt = np.meshgrid(x, t)
+
+        return pulse, grid_xt
