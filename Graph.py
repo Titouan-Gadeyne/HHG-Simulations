@@ -75,7 +75,7 @@ class Phase2D():
         key = self.colorize(z=z.T, mode=mode)
 
         ins = inset_axes(ax, width="100%", height="100%",
-                   bbox_to_anchor=(1.05, 0, .05, .6),
+                   bbox_to_anchor=(1.05, 0.15, .08, .7),
                    bbox_transform=ax.transAxes, loc=2, borderpad=0)
         ins.imshow(key, extent=[0, 1, -np.pi, np.pi])
         ins.tick_params(left=False, right=True, labelleft=False, labelright=True)
@@ -86,6 +86,7 @@ class Phase2D():
         elif mode=="Intensity":
             ins.set_xlabel(r'$|E|^2$')
         ins.set_ylabel(r'$\arg{E}$')
+        ins.yaxis.set_label_position("right")
 
         return ins
 
