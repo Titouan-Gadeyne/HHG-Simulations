@@ -286,3 +286,6 @@ class Grating(): # FT a x-t field along t
         grid_xt = np.meshgrid(x, t)
 
         return pulse, grid_xt
+
+
+
