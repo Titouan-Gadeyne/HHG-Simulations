@@ -9,6 +9,7 @@ class Beam():
         self.lam = lam
         self.k = 2*np.pi/self.lam
         self.zR = np.pi*self.w0**2/self.lam 
+        self.omega = 2*np.pi*3e8/self.lam 
 
     "Transverse mode formulae"
     # Gaussian beam expressions
@@ -35,9 +36,9 @@ class Beam():
     def LGBeam(self, x, y, z, l, p):
         r = np.sqrt(x**2 + y**2)
         theta = np.arctan2(y, x)
-        C = np.sqrt( 2*np.math.factorial(p) / (np.pi + np.math.factorial(p+np.abs(l)) ) ) # normalization factor
+        C = np.sqrt( 2*np.math.factorial(p) / (np.pi * np.math.factorial(p+np.abs(l)) ) ) # normalization factor
         return self.GBeam(x, y, z) \
-                * C * genlaguerre(p, np.abs(l))(2*r**2/self.w(z)**2) * np.exp(-1j*l*theta) * (r*np.sqrt(2)/self.w(z))**np.abs(l) * np.exp(-1j*self.Gouy(z)*(np.abs(l)+2*p))
+                * C / self.w0 * genlaguerre(p, np.abs(l))(2*r**2/self.w(z)**2) * np.exp(1j*l*theta) * (r*np.sqrt(2)/self.w(z))**np.abs(l) * np.exp(-1j*self.Gouy(z)*(np.abs(l)+2*p))
 
     # Hermite-Gaussian beam
     def HGBeam(self, x, y, z, m, n):
@@ -171,6 +172,91 @@ class Pulse():
         return field * ph2D
 
     "Propagation"
+    # Monochromatic 1D Fresnel
+    def Mono_1D_Fresnel(self, st_field, st_grid, d, lens=False, f=0, outlens=False):
+        x, t = st_grid[0][0], st_grid[1].T[0] # retrieve axes from meshgrid
+        Lx, Lt = x[-1]-x[0], t[-1]-t[0]
+        Nx, Nt = len(x), len(t)
+        xp = np.fft.fftshift(np.fft.fftfreq(Nx, Lx/(Nx-1)))*self.lam*d
+
+        # Multiply each slice by sph phase
+        if lens==True:
+            for i in range(len(st_field)):
+                st_field[i] = st_field[i] * np.exp(1j*2*np.pi*x**2/(2*self.lam*d)) * np.exp(-1j*2*np.pi*x**2/(2*self.lam*f))
+        else:
+            for i in range(len(st_field)):
+                st_field[i] = st_field[i] * np.exp(1j*2*np.pi*x**2/(2*self.lam*d))
+
+        # Propagate each slice
+        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(st_field, axes=1), axis=1), axes=1)
+        field = field * (Lx/(Nx-1))
+        field = field * (1/(2*np.pi)) * (self.omega/3e8) * np.exp(1j*(self.omega/3e8)*d) / (1j*d)
+
+        # Multiply each slice by sph phas
+        if outlens==True:
+            for i in range(len(field)):
+                field[i] = field[i] * np.exp(1j*2*np.pi*xp**2/(2*self.lam*d)) * np.exp(-1j*2*np.pi*xp**2/(2*self.lam*f))
+        else:
+            for i in range(len(field)):
+                field[i] = field[i] * np.exp(1j*2*np.pi*xp**2/(2*self.lam*d))
+
+        grid_ff_xt = np.meshgrid(xp, t)
+
+        return field, grid_ff_xt
+
+    # Polychromatic 1D Fresnel, all Fourier components are propagated separately
+    def Poly_1D_Fresnel(self, st_field, st_grid, d, lens=False, f=0, outlens=False):
+        # Compute the frequency spectrum
+        gr = Grating()
+        spectrum, xw_grid = gr.Disperse(field_0=st_field, grid_xt=st_grid)
+
+        x, w = xw_grid[0][0], xw_grid[1].T[0] # retrieve axes from meshgrid
+        Lx, Lw = x[-1]-x[0], w[-1]-w[0]
+        Nx, Nw = len(x), len(w)
+        lam_axis = 2*np.pi*3e8/w
+        #xp = np.fft.fftshift(np.fft.fftfreq(Nx, Lx/(Nx-1)))*lam_axis[-1]*d # choose the x axis of the largest lambda to fit everything in
+        xp = np.fft.fftshift(np.fft.fftfreq(Nx, Lx/(Nx-1)))*self.lam*d # choose the same axis as in the quasi-monochromatic case
+
+        # Multiply each frequency by spherical phase
+        if lens==True:
+            for i in range(len(spectrum)):
+                spectrum[i] = spectrum[i] * np.exp(1j*2*np.pi*x**2/(2*lam_axis[i]*d)) * np.exp(-1j*2*np.pi*x**2/(2*lam_axis[i]*f))
+        else:
+            for i in range(len(spectrum)):
+                spectrum[i] = spectrum[i] * np.exp(1j*2*np.pi*x**2/(2*lam_axis[i]*d))
+
+        # Propagate each frequency 
+        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(spectrum, axes=1), axis=1), axes=1)
+        field = field * (Lx/(Nx-1))
+        field = field * (1/(2*np.pi)) * (w[i]/3e8) * np.exp(1j*(w[i]/3e8)*d) / (1j*d)
+
+        # Interpolate each frequency on correct axis
+        for i in range(len(field)):
+            if d<0:
+                field[i] = np.flip(np.nan_to_num( np.interp(np.flip(xp), np.flip(xp*lam_axis[i]/self.lam), np.flip(field[i])) \
+                    / lam_axis[i]*d ))
+            else: 
+                field[i] = np.nan_to_num( np.interp(xp, xp*lam_axis[i]/self.lam, field[i]) \
+                    / lam_axis[i]*d )
+
+        # Multiply each frequency by spherical phase
+        if outlens==True:
+            for i in range(len(field)):
+                field[i] = field[i] * np.exp(1j*2*np.pi*xp**2/(2*lam_axis[i]*d)) * np.exp(-1j*2*np.pi*xp**2/(2*lam_axis[i]*f))
+        else:
+            for i in range(len(field)):
+                field[i] = field[i] * np.exp(1j*2*np.pi*xp**2/(2*lam_axis[i]*d))
+
+        grid_ff_xw = np.meshgrid(xp, w)
+
+        # IFT to the time domain
+        field, grid_ff_xt = gr.Recombine(field_0=field, grid_xt=grid_ff_xw)
+
+        return field, grid_ff_xt
+
+
+
+
     # Spherical phase factor
     def SphFactor(self, x, y, z):
         return np.exp((x**2 + y**2)*1j*self.k/(2*z))
@@ -214,6 +300,7 @@ class Pulse():
         field_d = field / (1j*self.lam*d) * np.exp(1j*self.k*d)
         
         return field_d, grid_d
+
 
     # Adds a phase factor to simulate passing through a lens
     def Lens(self, field, grid, f):
@@ -286,6 +373,32 @@ class Grating(): # FT a x-t field along t
         grid_xt = np.meshgrid(x, t)
 
         return pulse, grid_xt
+
+    def Disperse2(self, field, t_axis):
+
+        Lt = t_axis[-1]-t_axis[0]
+        Nt = len(t_axis)
+
+        spectrum = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(field, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
+        spectrum = spectrum * (Lt/(Nt-1)) # correct for the sampling rate (difference between continuous and discrete FT)
+
+        # Compute the conjugate omega axis
+        w_axis = np.fft.fftshift(np.fft.fftfreq(Nt, Lt/(Nt-1))) * 2*np.pi
+
+        return spectrum, w_axis
+
+    def Recombine2(self, spectrum, w_axis):
+
+        Lw = w_axis[-1]-w_axis[0]
+        Nw = len(w_axis)
+
+        field = np.fft.fftshift(np.fft.fft(np.fft.ifftshift(spectrum, axes=0), axis=0), axes=0) # fft assumes origin of axis at top left corner, need to fftshift beforehand
+        field = field * (Lw/(Nw-1)) # correct for the sampling rate (difference between continuous and discrete FT)
+
+        # Compute the conjugate omega axis
+        t_axis = np.fft.fftshift(np.fft.fftfreq(Nw, Lw/(Nw-1))) * 2*np.pi
+
+        return field, t_axis
 
 
 
